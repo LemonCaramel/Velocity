@@ -32,8 +32,13 @@ import com.mojang.brigadier.arguments.FloatArgumentType;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.LongArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
+import com.velocitypowered.api.network.ProtocolVersion;
 import com.velocitypowered.proxy.protocol.ProtocolUtils;
 import io.netty.buffer.ByteBuf;
+import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
+import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
+import it.unimi.dsi.fastutil.objects.Object2IntMap;
+import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import java.util.HashMap;
 import java.util.Map;
 import org.checkerframework.checker.nullness.qual.Nullable;
@@ -44,42 +49,73 @@ public class ArgumentPropertyRegistry {
   }
 
   private static final Map<String, ArgumentPropertySerializer<?>> byId = new HashMap<>();
+  private static final Int2ObjectMap<ArgumentPropertySerializer<?>> byIntId = new Int2ObjectOpenHashMap<>();
   private static final Map<Class<? extends ArgumentType>,
       ArgumentPropertySerializer<?>> byClass = new HashMap<>();
+  private static final Int2ObjectMap<String> intIdToId = new Int2ObjectOpenHashMap<>();
   private static final Map<Class<? extends ArgumentType>, String> classToId = new HashMap<>();
+  private static final Object2IntMap<Class<? extends ArgumentType>> classToIntId = new Object2IntOpenHashMap<>();
 
   private static <T extends ArgumentType<?>> void register(String identifier, Class<T> klazz,
       ArgumentPropertySerializer<T> serializer) {
+    register(-1, identifier, klazz, serializer);
+  }
+
+  private static <T extends ArgumentType<?>> void register(int id, String identifier,
+      Class<T> klazz, ArgumentPropertySerializer<T> serializer) {
     byId.put(identifier, serializer);
     byClass.put(klazz, serializer);
     classToId.put(klazz, identifier);
+    if (id != -1) {
+      byIntId.put(id, serializer);
+      intIdToId.put(id, identifier);
+      classToIntId.put(klazz, id);
+    }
   }
 
   private static <T> void empty(String identifier) {
-    empty(identifier, EMPTY);
+    empty(-1, identifier);
   }
 
-  private static <T> void empty(String identifier, ArgumentPropertySerializer<T> serializer) {
+  private static <T> void empty(int id, String identifier) {
+    empty(id, identifier, EMPTY);
+  }
+
+  private static <T> void empty(int id, String identifier, ArgumentPropertySerializer<T> serializer) {
     byId.put(identifier, serializer);
+    if (id != -1) {
+      byIntId.put(id, serializer);
+    }
   }
 
   /**
    * Deserializes the {@link ArgumentType}.
    * @param buf the buffer to deserialize
+   * @param version client protocol version
    * @return the deserialized {@link ArgumentType}
    */
-  public static ArgumentType<?> deserialize(ByteBuf buf) {
-    String identifier = ProtocolUtils.readString(buf);
-    ArgumentPropertySerializer<?> serializer = byId.get(identifier);
+  public static ArgumentType<?> deserialize(ByteBuf buf, ProtocolVersion version) {
+    int intId;
+    String identifier;
+    ArgumentPropertySerializer<?> serializer;
+    if (version.compareTo(ProtocolVersion.MINECRAFT_1_19) >= 0) {
+      intId = ProtocolUtils.readVarInt(buf);
+      identifier = intIdToId.get(intId);
+      serializer = byIntId.get(intId);
+    } else {
+      identifier = ProtocolUtils.readString(buf);
+      serializer = byId.get(identifier);
+      intId = classToIntId.getInt(serializer);
+    }
     if (serializer == null) {
-      throw new IllegalArgumentException("Argument type identifier " + identifier + " unknown.");
+      throw new IllegalArgumentException("Argument type identifier " + identifier + " unknown. (" + intId + ")");
     }
     Object result = serializer.deserialize(buf);
 
     if (result instanceof ArgumentType) {
       return (ArgumentType<?>) result;
     } else {
-      return new PassthroughProperty(identifier, serializer, result);
+      return new PassthroughProperty(intId, identifier, serializer, result);
     }
   }
 
@@ -87,11 +123,16 @@ public class ArgumentPropertyRegistry {
    * Serializes the {@code type} into the provided {@code buf}.
    * @param buf the buffer to serialize into
    * @param type the type to serialize
+   * @param version client protocol version
    */
-  public static void serialize(ByteBuf buf, ArgumentType<?> type) {
+  public static void serialize(ByteBuf buf, ArgumentType<?> type, ProtocolVersion version) {
     if (type instanceof PassthroughProperty) {
       PassthroughProperty property = (PassthroughProperty) type;
-      ProtocolUtils.writeString(buf, property.getIdentifier());
+      if (version.compareTo(ProtocolVersion.MINECRAFT_1_19) >= 0) {
+        ProtocolUtils.writeVarInt(buf, property.getIntId());
+      } else {
+        ProtocolUtils.writeString(buf, property.getIdentifier());
+      }
       if (property.getResult() != null) {
         property.getSerializer().serialize(property.getResult(), buf);
       }
@@ -101,23 +142,33 @@ public class ArgumentPropertyRegistry {
       buf.writeBytes(property.getData());
     } else {
       ArgumentPropertySerializer serializer = byClass.get(type.getClass());
-      String id = classToId.get(type.getClass());
-      if (serializer == null || id == null) {
-        throw new IllegalArgumentException("Don't know how to serialize "
-            + type.getClass().getName());
+      if (version.compareTo(ProtocolVersion.MINECRAFT_1_19) >= 0) {
+        int id = classToIntId.getInt(type.getClass());
+        if (serializer == null || id == -1) {
+          throw new IllegalArgumentException("Don't know how to serialize "
+              + type.getClass().getName() + " (ID: " + id + ")");
+        }
+        ProtocolUtils.writeVarInt(buf, id);
+      } else {
+        String id = classToId.get(type.getClass());
+        if (serializer == null || id == null) {
+          throw new IllegalArgumentException("Don't know how to serialize "
+              + type.getClass().getName());
+        }
+        ProtocolUtils.writeString(buf, id);
       }
-      ProtocolUtils.writeString(buf, id);
       serializer.serialize(type, buf);
     }
   }
 
   static {
+    classToIntId.defaultReturnValue(-1);
     // Base Brigadier argument types
-    register("brigadier:string", StringArgumentType.class, STRING);
-    register("brigadier:integer", IntegerArgumentType.class, INTEGER);
-    register("brigadier:float", FloatArgumentType.class, FLOAT);
-    register("brigadier:double", DoubleArgumentType.class, DOUBLE);
-    register("brigadier:bool", BoolArgumentType.class,
+    register(5, "brigadier:string", StringArgumentType.class, STRING);
+    register(3, "brigadier:integer", IntegerArgumentType.class, INTEGER);
+    register(1, "brigadier:float", FloatArgumentType.class, FLOAT);
+    register(2, "brigadier:double", DoubleArgumentType.class, DOUBLE);
+    register(0, "brigadier:bool", BoolArgumentType.class,
         new ArgumentPropertySerializer<>() {
           @Override
           public BoolArgumentType deserialize(ByteBuf buf) {
@@ -129,54 +180,54 @@ public class ArgumentPropertyRegistry {
 
           }
         });
-    register("brigadier:long", LongArgumentType.class, LONG);
-    register("minecraft:resource", RegistryKeyArgument.class, RegistryKeyArgumentSerializer.REGISTRY);
-    register("minecraft:resource_or_tag", RegistryKeyArgument.class, RegistryKeyArgumentSerializer.REGISTRY);
+    register(4, "brigadier:long", LongArgumentType.class, LONG);
+    register(43, "minecraft:resource", RegistryKeyArgument.class, RegistryKeyArgumentSerializer.REGISTRY);
+    register(44, "minecraft:resource_or_tag", RegistryKeyArgument.class, RegistryKeyArgumentSerializer.REGISTRY);
 
     // Crossstitch support
     register("crossstitch:mod_argument", ModArgumentProperty.class, MOD);
 
     // Minecraft argument types with extra properties
-    empty("minecraft:entity", ByteArgumentPropertySerializer.BYTE);
-    empty("minecraft:score_holder", ByteArgumentPropertySerializer.BYTE);
+    empty(6, "minecraft:entity", ByteArgumentPropertySerializer.BYTE);
+    empty(29, "minecraft:score_holder", ByteArgumentPropertySerializer.BYTE);
 
     // Minecraft argument types
-    empty("minecraft:game_profile");
-    empty("minecraft:block_pos");
-    empty("minecraft:column_pos");
-    empty("minecraft:vec3");
-    empty("minecraft:vec2");
-    empty("minecraft:block_state");
-    empty("minecraft:block_predicate");
-    empty("minecraft:item_stack");
-    empty("minecraft:item_predicate");
-    empty("minecraft:color");
-    empty("minecraft:component");
-    empty("minecraft:message");
+    empty(7, "minecraft:game_profile");
+    empty(8, "minecraft:block_pos");
+    empty(9, "minecraft:column_pos");
+    empty(10, "minecraft:vec3");
+    empty(11, "minecraft:vec2");
+    empty(12, "minecraft:block_state");
+    empty(13, "minecraft:block_predicate");
+    empty(14, "minecraft:item_stack");
+    empty(15, "minecraft:item_predicate");
+    empty(16, "minecraft:color");
+    empty(17, "minecraft:component");
+    empty(18, "minecraft:message");
     empty("minecraft:nbt");
-    empty("minecraft:nbt_compound_tag"); // added in 1.14
-    empty("minecraft:nbt_tag"); // added in 1.14
-    empty("minecraft:nbt_path");
-    empty("minecraft:objective");
-    empty("minecraft:objective_criteria");
-    empty("minecraft:operation");
-    empty("minecraft:particle");
-    empty("minecraft:rotation");
-    empty("minecraft:scoreboard_slot");
-    empty("minecraft:swizzle");
-    empty("minecraft:team");
-    empty("minecraft:item_slot");
-    empty("minecraft:resource_location");
-    empty("minecraft:mob_effect");
-    empty("minecraft:function");
-    empty("minecraft:entity_anchor");
-    empty("minecraft:item_enchantment");
-    empty("minecraft:entity_summon");
-    empty("minecraft:dimension");
-    empty("minecraft:int_range");
-    empty("minecraft:float_range");
-    empty("minecraft:time"); // added in 1.14
-    empty("minecraft:uuid"); // added in 1.16
-    empty("minecraft:angle"); // added in 1.16.2
+    empty(19, "minecraft:nbt_compound_tag"); // added in 1.14
+    empty(20, "minecraft:nbt_tag"); // added in 1.14
+    empty(21, "minecraft:nbt_path");
+    empty(22, "minecraft:objective");
+    empty(23, "minecraft:objective_criteria");
+    empty(24, "minecraft:operation");
+    empty(25, "minecraft:particle");
+    empty(27, "minecraft:rotation");
+    empty(28, "minecraft:scoreboard_slot");
+    empty(30, "minecraft:swizzle");
+    empty(31, "minecraft:team");
+    empty(32, "minecraft:item_slot");
+    empty(33, "minecraft:resource_location");
+    empty(34, "minecraft:mob_effect");
+    empty(35, "minecraft:function");
+    empty(36, "minecraft:entity_anchor");
+    empty(39, "minecraft:item_enchantment");
+    empty(40, "minecraft:entity_summon");
+    empty(41, "minecraft:dimension");
+    empty(37, "minecraft:int_range");
+    empty(38, "minecraft:float_range");
+    empty(42, "minecraft:time"); // added in 1.14
+    empty(45, "minecraft:uuid"); // added in 1.16
+    empty(26, "minecraft:angle"); // added in 1.16.2
   }
 }

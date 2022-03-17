@@ -23,15 +23,21 @@ import org.checkerframework.checker.nullness.qual.Nullable;
 
 class PassthroughProperty<T> implements ArgumentType<T> {
 
+  private final int intId;
   private final String identifier;
   private final ArgumentPropertySerializer<T> serializer;
   private final @Nullable T result;
 
-  PassthroughProperty(String identifier, ArgumentPropertySerializer<T> serializer,
+  PassthroughProperty(int intId, String identifier, ArgumentPropertySerializer<T> serializer,
       @Nullable T result) {
+    this.intId = intId;
     this.identifier = identifier;
     this.serializer = serializer;
     this.result = result;
+  }
+
+  public int getIntId() {
+    return intId;
   }
 
   public String getIdentifier() {
