@@ -28,6 +28,7 @@ import static com.velocitypowered.api.network.ProtocolVersion.MINECRAFT_1_16_2;
 import static com.velocitypowered.api.network.ProtocolVersion.MINECRAFT_1_16_4;
 import static com.velocitypowered.api.network.ProtocolVersion.MINECRAFT_1_17;
 import static com.velocitypowered.api.network.ProtocolVersion.MINECRAFT_1_18;
+import static com.velocitypowered.api.network.ProtocolVersion.MINECRAFT_1_18_2;
 import static com.velocitypowered.api.network.ProtocolVersion.MINECRAFT_1_19;
 import static com.velocitypowered.api.network.ProtocolVersion.MINECRAFT_1_7_2;
 import static com.velocitypowered.api.network.ProtocolVersion.MINECRAFT_1_8;
@@ -123,7 +124,7 @@ public enum StateRegistry {
           map(0x02, MINECRAFT_1_9, false),
           map(0x03, MINECRAFT_1_12, false),
           map(0x02, MINECRAFT_1_12_1, false),
-          map(0x03, MINECRAFT_1_14, MINECRAFT_1_18, false));
+          map(0x03, MINECRAFT_1_14, MINECRAFT_1_18_2, false));
       serverbound.register(PlayerChatPacket.class, PlayerChatPacket::new,
           map(0x03, MINECRAFT_1_19, false));
       serverbound.register(ClientSettings.class, ClientSettings::new,
@@ -170,7 +171,7 @@ public enum StateRegistry {
           map(0x0E, MINECRAFT_1_13, true),
           map(0x0F, MINECRAFT_1_15, true),
           map(0x0E, MINECRAFT_1_16, true),
-          map(0x0F, MINECRAFT_1_17, MINECRAFT_1_18, true));
+          map(0x0F, MINECRAFT_1_17, MINECRAFT_1_18_2, true));
       clientbound.register(PlayerChatPacket.class, PlayerChatPacket::new,
           map(0x2F, MINECRAFT_1_19, false));
       clientbound.register(SystemChatPacket.class, SystemChatPacket::new,
