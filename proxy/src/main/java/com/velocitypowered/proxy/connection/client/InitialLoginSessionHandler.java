@@ -18,6 +18,7 @@
 package com.velocitypowered.proxy.connection.client;
 
 import static com.google.common.net.UrlEscapers.urlFormParameterEscaper;
+import static com.velocitypowered.api.network.ProtocolVersion.MINECRAFT_1_19;
 import static com.velocitypowered.proxy.VelocityServer.GENERAL_GSON;
 import static com.velocitypowered.proxy.connection.VelocityConstants.EMPTY_BYTE_ARRAY;
 import static com.velocitypowered.proxy.util.EncryptionUtils.decryptRsa;
@@ -35,15 +36,20 @@ import com.velocitypowered.proxy.protocol.packet.EncryptionRequest;
 import com.velocitypowered.proxy.protocol.packet.EncryptionResponse;
 import com.velocitypowered.proxy.protocol.packet.LoginPluginResponse;
 import com.velocitypowered.proxy.protocol.packet.ServerLogin;
+import com.velocitypowered.proxy.util.EncryptionUtils;
 import io.netty.buffer.ByteBuf;
 import java.net.InetSocketAddress;
 import java.security.GeneralSecurityException;
 import java.security.KeyPair;
 import java.security.MessageDigest;
+import java.security.PublicKey;
+import java.security.Signature;
+import java.time.Instant;
 import java.util.Arrays;
 import java.util.Optional;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ThreadLocalRandom;
+import net.kyori.adventure.nbt.CompoundBinaryTag;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.apache.logging.log4j.LogManager;
@@ -64,6 +70,7 @@ public class InitialLoginSessionHandler implements MinecraftSessionHandler {
   private final LoginInboundConnection inbound;
   private @MonotonicNonNull ServerLogin login;
   private byte[] verify = EMPTY_BYTE_ARRAY;
+  private String publicKey = "";
   private LoginState currentState = LoginState.LOGIN_PACKET_EXPECTED;
 
   InitialLoginSessionHandler(VelocityServer server, MinecraftConnection mcConnection,
@@ -78,6 +85,45 @@ public class InitialLoginSessionHandler implements MinecraftSessionHandler {
     assertState(LoginState.LOGIN_PACKET_EXPECTED);
     this.currentState = LoginState.LOGIN_PACKET_RECEIVED;
     this.login = packet;
+
+    if (mcConnection.getProtocolVersion().compareTo(MINECRAFT_1_19) >= 0) {
+      final CompoundBinaryTag publicKey = this.login.getPublicKey();
+      if (publicKey == null) {
+        inbound.disconnect(Component.translatable("multiplayer.disconnect.missing_public_key"));
+        return true;
+      }
+
+      final Instant expiresAt = Instant.parse(publicKey.getString("expires_at"));
+      final String keyString = publicKey.getString("key");
+      final String signature = publicKey.getString("signature");
+      final GameProfile.Property property = new GameProfile.Property(
+              "publicKey", expiresAt.toEpochMilli() + keyString, signature
+      );
+
+      if (property.getSignature().isEmpty()) {
+        logger.error("Signature is missing from Property {}", property.getName());
+        inbound.disconnect(Component.translatable("multiplayer.disconnect.invalid_public_key_signature"));
+        return true;
+      }
+
+      if (!EncryptionUtils.isSignatureValid(property)) {
+        logger.error("Property {} has been tampered with (signature invalid)", property.getName());
+        inbound.disconnect(Component.translatable("multiplayer.disconnect.invalid_public_key_signature"));
+        return true;
+      }
+
+      /* An unnecessary process - Don't trust the server? */
+      // 1. SKIP TIMESTAMP CHECK
+      // 2. SKIP PUBLIC KEY PARSE CHECK
+      // 3. SKIP CREATE PAIR
+
+      if (expiresAt.isBefore(Instant.now())) {
+        inbound.disconnect(Component.text("Expired profile public key"));
+        return true;
+      }
+
+      this.publicKey = keyString;
+    }
 
     PreLoginEvent event = new PreLoginEvent(inbound, login.getUsername());
     server.getEventManager().fire(event)
@@ -147,9 +193,30 @@ public class InitialLoginSessionHandler implements MinecraftSessionHandler {
 
     try {
       KeyPair serverKeyPair = server.getServerKeyPair();
-      byte[] decryptedVerifyToken = decryptRsa(serverKeyPair, packet.getVerifyToken());
-      if (!MessageDigest.isEqual(verify, decryptedVerifyToken)) {
-        throw new IllegalStateException("Unable to successfully decrypt the verification token.");
+      boolean legacyProcess = true;
+
+      // Minecraft 1.19+ Login process
+      if (mcConnection.getProtocolVersion().compareTo(MINECRAFT_1_19) >= 0) {
+        final PublicKey publickey = EncryptionUtils.stringToRsaPublicKey(this.publicKey);
+        if (packet.getSaltSignature() != null) {
+          final Signature verifySig = Signature.getInstance("SHA1withRSA");
+          verifySig.initVerify(publickey);
+          verifySig.update(this.verify);
+          verifySig.update(packet.getSaltSignature().saltAsBytes());
+          if (!verifySig.verify(packet.getSaltSignature().signature)) {
+            inbound.disconnect(Component.text("Protocol error"));
+            return true;
+          }
+          legacyProcess = false;
+        }
+      }
+
+      // Minecraft <= 1.18 Login process
+      if (legacyProcess) {
+        byte[] decryptedVerifyToken = decryptRsa(serverKeyPair, packet.getVerifyToken());
+        if (!MessageDigest.isEqual(verify, decryptedVerifyToken)) {
+          throw new IllegalStateException("Unable to successfully decrypt the verification token.");
+        }
       }
 
       byte[] decryptedSharedSecret = decryptRsa(serverKeyPair, packet.getSharedSecret());

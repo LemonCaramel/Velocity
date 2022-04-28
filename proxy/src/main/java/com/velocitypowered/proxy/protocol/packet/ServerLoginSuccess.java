@@ -71,6 +71,9 @@ public class ServerLoginSuccess implements MinecraftPacket {
       uuid = UuidUtils.fromUndashed(ProtocolUtils.readString(buf, 32));
     }
     username = ProtocolUtils.readString(buf, 16);
+    if (version.compareTo(ProtocolVersion.MINECRAFT_1_19) >= 0) {
+      ProtocolUtils.readVarInt(buf);  // No property
+    }
   }
 
   @Override
@@ -89,6 +92,9 @@ public class ServerLoginSuccess implements MinecraftPacket {
       throw new IllegalStateException("No username specified!");
     }
     ProtocolUtils.writeString(buf, username);
+    if (version.compareTo(ProtocolVersion.MINECRAFT_1_19) >= 0) {
+      ProtocolUtils.writeVarInt(buf, 0); // No property
+    }
   }
 
   @Override

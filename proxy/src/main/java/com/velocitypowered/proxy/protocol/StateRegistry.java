@@ -40,7 +40,6 @@ import static com.velocitypowered.proxy.protocol.ProtocolUtils.Direction;
 import com.velocitypowered.api.network.ProtocolVersion;
 import com.velocitypowered.proxy.protocol.packet.AvailableCommands;
 import com.velocitypowered.proxy.protocol.packet.BossBar;
-import com.velocitypowered.proxy.protocol.packet.Chat;
 import com.velocitypowered.proxy.protocol.packet.ClientSettings;
 import com.velocitypowered.proxy.protocol.packet.Disconnect;
 import com.velocitypowered.proxy.protocol.packet.EncryptionRequest;
@@ -64,6 +63,9 @@ import com.velocitypowered.proxy.protocol.packet.StatusRequest;
 import com.velocitypowered.proxy.protocol.packet.StatusResponse;
 import com.velocitypowered.proxy.protocol.packet.TabCompleteRequest;
 import com.velocitypowered.proxy.protocol.packet.TabCompleteResponse;
+import com.velocitypowered.proxy.protocol.packet.chat.LegacyChatPacket;
+import com.velocitypowered.proxy.protocol.packet.chat.PlayerChatPacket;
+import com.velocitypowered.proxy.protocol.packet.chat.SystemChatPacket;
 import com.velocitypowered.proxy.protocol.packet.title.LegacyTitlePacket;
 import com.velocitypowered.proxy.protocol.packet.title.TitleActionbarPacket;
 import com.velocitypowered.proxy.protocol.packet.title.TitleClearPacket;
@@ -116,12 +118,14 @@ public enum StateRegistry {
           map(0x01, MINECRAFT_1_12_1, false),
           map(0x05, MINECRAFT_1_13, false),
           map(0x06, MINECRAFT_1_14, false));
-      serverbound.register(Chat.class, Chat::new,
+      serverbound.register(LegacyChatPacket.class, LegacyChatPacket::new,
           map(0x01, MINECRAFT_1_7_2, false),
           map(0x02, MINECRAFT_1_9, false),
           map(0x03, MINECRAFT_1_12, false),
           map(0x02, MINECRAFT_1_12_1, false),
-          map(0x03, MINECRAFT_1_14, false));
+          map(0x03, MINECRAFT_1_14, MINECRAFT_1_18, false));
+      serverbound.register(PlayerChatPacket.class, PlayerChatPacket::new,
+          map(0x03, MINECRAFT_1_19, false));
       serverbound.register(ClientSettings.class, ClientSettings::new,
           map(0x15, MINECRAFT_1_7_2, false),
           map(0x04, MINECRAFT_1_9, false),
@@ -160,14 +164,17 @@ public enum StateRegistry {
           map(0x0C, MINECRAFT_1_16, false),
           map(0x0D, MINECRAFT_1_17, false),
           map(0x0A, MINECRAFT_1_19, false));
-      clientbound.register(Chat.class, Chat::new,
+      clientbound.register(LegacyChatPacket.class, LegacyChatPacket::new,
           map(0x02, MINECRAFT_1_7_2, true),
           map(0x0F, MINECRAFT_1_9, true),
           map(0x0E, MINECRAFT_1_13, true),
           map(0x0F, MINECRAFT_1_15, true),
           map(0x0E, MINECRAFT_1_16, true),
-          map(0x0F, MINECRAFT_1_17, true),
-          map(0x0C, MINECRAFT_1_19, true));
+          map(0x0F, MINECRAFT_1_17, MINECRAFT_1_18, true));
+      clientbound.register(PlayerChatPacket.class, PlayerChatPacket::new,
+          map(0x2F, MINECRAFT_1_19, false));
+      clientbound.register(SystemChatPacket.class, SystemChatPacket::new,
+          map(0x5C, MINECRAFT_1_19, false));
       clientbound.register(TabCompleteResponse.class, TabCompleteResponse::new,
           map(0x3A, MINECRAFT_1_7_2, false),
           map(0x0E, MINECRAFT_1_9, false),
@@ -176,14 +183,14 @@ public enum StateRegistry {
           map(0x10, MINECRAFT_1_16, false),
           map(0x0F, MINECRAFT_1_16_2, false),
           map(0x11, MINECRAFT_1_17, false),
-          map(0x0E, MINECRAFT_1_19, false));
+          map(0x0D, MINECRAFT_1_19, false));
       clientbound.register(AvailableCommands.class, AvailableCommands::new,
           map(0x11, MINECRAFT_1_13, false),
           map(0x12, MINECRAFT_1_15, false),
           map(0x11, MINECRAFT_1_16, false),
           map(0x10, MINECRAFT_1_16_2, false),
           map(0x12, MINECRAFT_1_17, false),
-          map(0x0F, MINECRAFT_1_19, false));
+          map(0x0E, MINECRAFT_1_19, false));
       clientbound.register(PluginMessage.class, PluginMessage::new,
           map(0x3F, MINECRAFT_1_7_2, false),
           map(0x18, MINECRAFT_1_9, false),
@@ -193,7 +200,7 @@ public enum StateRegistry {
           map(0x18, MINECRAFT_1_16, false),
           map(0x17, MINECRAFT_1_16_2, false),
           map(0x18, MINECRAFT_1_17, false),
-          map(0x15, MINECRAFT_1_19, false));
+          map(0x14, MINECRAFT_1_19, false));
       clientbound.register(Disconnect.class, Disconnect::new,
           map(0x40, MINECRAFT_1_7_2, false),
           map(0x1A, MINECRAFT_1_9, false),
@@ -203,7 +210,7 @@ public enum StateRegistry {
           map(0x1A, MINECRAFT_1_16, false),
           map(0x19, MINECRAFT_1_16_2, false),
           map(0x1A, MINECRAFT_1_17, false),
-          map(0x17, MINECRAFT_1_19, false));
+          map(0x16, MINECRAFT_1_19, false));
       clientbound.register(KeepAlive.class, KeepAlive::new,
           map(0x00, MINECRAFT_1_7_2, false),
           map(0x1F, MINECRAFT_1_9, false),
@@ -213,7 +220,7 @@ public enum StateRegistry {
           map(0x20, MINECRAFT_1_16, false),
           map(0x1F, MINECRAFT_1_16_2, false),
           map(0x21, MINECRAFT_1_17, false),
-          map(0x1E, MINECRAFT_1_19, false));
+          map(0x1D, MINECRAFT_1_19, false));
       clientbound.register(JoinGame.class, JoinGame::new,
           map(0x01, MINECRAFT_1_7_2, false),
           map(0x23, MINECRAFT_1_9, false),
@@ -223,7 +230,7 @@ public enum StateRegistry {
           map(0x25, MINECRAFT_1_16, false),
           map(0x24, MINECRAFT_1_16_2, false),
           map(0x26, MINECRAFT_1_17, false),
-          map(0x23, MINECRAFT_1_19, false));
+          map(0x22, MINECRAFT_1_19, false));
       clientbound.register(Respawn.class, Respawn::new,
           map(0x07, MINECRAFT_1_7_2, true),
           map(0x33, MINECRAFT_1_9, true),
@@ -260,7 +267,7 @@ public enum StateRegistry {
           map(0x53, MINECRAFT_1_16, true),
           map(0x5E, MINECRAFT_1_17, true),
           map(0x5F, MINECRAFT_1_18, true),
-          map(0x5C, MINECRAFT_1_19, true));
+          map(0x5D, MINECRAFT_1_19, true));
       clientbound.register(LegacyTitlePacket.class, LegacyTitlePacket::new,
           map(0x45, MINECRAFT_1_8, true),
           map(0x45, MINECRAFT_1_9, true),
@@ -287,7 +294,7 @@ public enum StateRegistry {
           map(0x58, MINECRAFT_1_19, true));
       clientbound.register(TitleClearPacket.class, TitleClearPacket::new,
           map(0x10, MINECRAFT_1_17, true),
-          map(0x0D, MINECRAFT_1_19, true));
+          map(0x0C, MINECRAFT_1_19, true));
       clientbound.register(PlayerListItem.class, PlayerListItem::new,
           map(0x38, MINECRAFT_1_7_2, false),
           map(0x2D, MINECRAFT_1_9, false),

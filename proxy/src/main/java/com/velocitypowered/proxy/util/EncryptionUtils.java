@@ -17,17 +17,44 @@
 
 package com.velocitypowered.proxy.util;
 
+import com.velocitypowered.api.util.GameProfile;
+import java.io.ByteArrayOutputStream;
+import java.io.InputStream;
 import java.math.BigInteger;
 import java.security.GeneralSecurityException;
+import java.security.InvalidKeyException;
+import java.security.KeyFactory;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.PublicKey;
+import java.security.Signature;
+import java.security.SignatureException;
+import java.security.spec.X509EncodedKeySpec;
+import java.util.Base64;
 import javax.crypto.Cipher;
 
 public enum EncryptionUtils {
   ;
+  private static final PublicKey SIGNATURE_KEY;
+
+  static {
+    try (InputStream in = EncryptionUtils.class.getResourceAsStream("/yggdrasil_session_pubkey.der")) {
+      final ByteArrayOutputStream out = new ByteArrayOutputStream();
+
+      byte[] buffer = new byte[4096];
+      int length;
+      while ((length = in.read(buffer)) != -1) {
+        out.write(buffer, 0, length);
+      }
+      out.close();
+
+      SIGNATURE_KEY = KeyFactory.getInstance("RSA").generatePublic(new X509EncodedKeySpec(out.toByteArray()));
+    } catch (Exception e) {
+      throw new ExceptionInInitializerError("Can't read the yggdrasil public key.");
+    }
+  }
 
   /**
    * Generates an RSA key pair.
@@ -84,6 +111,51 @@ public enum EncryptionUtils {
       return twosComplementHexdigest(digest.digest());
     } catch (NoSuchAlgorithmException e) {
       throw new AssertionError(e);
+    }
+  }
+
+  /**
+   * Check the signature is valid.
+   *
+   * @param property the Property
+   * @return if {@code true} signature is valid
+   */
+  public static boolean isSignatureValid(GameProfile.Property property) {
+    try {
+      final Signature signature = Signature.getInstance("SHA1withRSA");
+      signature.initVerify(SIGNATURE_KEY);
+      signature.update(property.getValue().getBytes());
+      return signature.verify(Base64.getDecoder().decode(property.getSignature()));
+    } catch (final NoSuchAlgorithmException | InvalidKeyException | SignatureException e) {
+      e.printStackTrace();
+      throw new AssertionError(e);
+    }
+  }
+
+  /**
+   * String public key to RSA public key.
+   *
+   * @param publicKey string key
+   * @return the rsa public key
+   */
+  public static PublicKey stringToRsaPublicKey(String publicKey) {
+    final String begin = "-----BEGIN RSA PUBLIC KEY-----";
+    final String end = "-----END RSA PUBLIC KEY-----";
+
+    int startIndex = publicKey.indexOf(begin);
+    if (startIndex != -1) {
+      startIndex += begin.length();
+      int endIndex = publicKey.indexOf(end, startIndex);
+
+      publicKey = publicKey.substring(startIndex, endIndex + 1);
+    }
+
+    try {
+      return KeyFactory.getInstance("RSA").generatePublic(
+          new X509EncodedKeySpec(Base64.getMimeDecoder().decode(publicKey))
+      );
+    } catch (Exception exception) {
+      throw new IllegalStateException(exception);
     }
   }
 }

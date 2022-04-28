@@ -25,6 +25,8 @@ import com.velocitypowered.proxy.protocol.ProtocolUtils;
 import com.velocitypowered.proxy.protocol.ProtocolUtils.Direction;
 import com.velocitypowered.proxy.util.except.QuietDecoderException;
 import io.netty.buffer.ByteBuf;
+import net.kyori.adventure.nbt.BinaryTagIO;
+import net.kyori.adventure.nbt.CompoundBinaryTag;
 import org.checkerframework.checker.nullness.qual.Nullable;
 
 public class ServerLogin implements MinecraftPacket {
@@ -32,6 +34,7 @@ public class ServerLogin implements MinecraftPacket {
   private static final QuietDecoderException EMPTY_USERNAME = new QuietDecoderException("Empty username!");
 
   private @Nullable String username;
+  private @Nullable CompoundBinaryTag publicKey;
 
   public ServerLogin() {
   }
@@ -47,10 +50,15 @@ public class ServerLogin implements MinecraftPacket {
     return username;
   }
 
+  public CompoundBinaryTag getPublicKey() {
+    return publicKey;
+  }
+
   @Override
   public String toString() {
     return "ServerLogin{"
         + "username='" + username + '\''
+        + ", publicKey='" + publicKey + '\''
         + '}';
   }
 
@@ -60,6 +68,11 @@ public class ServerLogin implements MinecraftPacket {
     if (username.isEmpty()) {
       throw EMPTY_USERNAME;
     }
+    if (version.compareTo(ProtocolVersion.MINECRAFT_1_19) >= 0) {
+      if (buf.readBoolean()) { // Optional
+        publicKey = ProtocolUtils.readCompoundTag(buf, BinaryTagIO.reader());
+      }
+    }
   }
 
   @Override
@@ -68,13 +81,29 @@ public class ServerLogin implements MinecraftPacket {
       throw new IllegalStateException("No username found!");
     }
     ProtocolUtils.writeString(buf, username);
+    if (version.compareTo(ProtocolVersion.MINECRAFT_1_19) >= 0) {
+      boolean hasPublicKey = (publicKey != null);
+      buf.writeBoolean(hasPublicKey);
+      if (hasPublicKey) { // Optional
+        System.out.println("ServerLogin encode 4");
+        ProtocolUtils.writeCompoundTag(buf, publicKey);
+      }
+    }
   }
 
   @Override
   public int expectedMaxLength(ByteBuf buf, Direction direction, ProtocolVersion version) {
     // Accommodate the rare (but likely malicious) use of UTF-8 usernames, since it is technically
     // legal on the protocol level.
-    return 1 + (16 * 4);
+    final int origin = 1 + (16 * 4);
+    if (version.compareTo(ProtocolVersion.MINECRAFT_1_19) >= 0) {
+      // https://api.minecraftservices.com/player/certificates
+      // Authorization: Bearer <ygg_token>
+      // expires_at(10 + 27 byte), [publicKey]signature(9 + 1024(max?) byte) , [public]key(3 + ???)
+      return origin + 2048; // i don't have a good idea
+    } else {
+      return origin;
+    }
   }
 
   @Override
