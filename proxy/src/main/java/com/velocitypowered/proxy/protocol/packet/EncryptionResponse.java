@@ -63,7 +63,7 @@ public class EncryptionResponse implements MinecraftPacket {
         if (buf.readBoolean()) {
           this.verifyToken = ProtocolUtils.readByteArray(buf, 128);
         } else {
-            this.saltSignature = SaltSignature.decode(buf);
+          this.saltSignature = SaltSignature.decode(buf);
         }
       } else {
         this.verifyToken = ProtocolUtils.readByteArray(buf, 128);

@@ -85,7 +85,6 @@ public class ServerLogin implements MinecraftPacket {
       boolean hasPublicKey = (publicKey != null);
       buf.writeBoolean(hasPublicKey);
       if (hasPublicKey) { // Optional
-        System.out.println("ServerLogin encode 4");
         ProtocolUtils.writeCompoundTag(buf, publicKey);
       }
     }

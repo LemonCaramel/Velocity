@@ -97,7 +97,7 @@ public class InitialLoginSessionHandler implements MinecraftSessionHandler {
       final String keyString = publicKey.getString("key");
       final String signature = publicKey.getString("signature");
       final GameProfile.Property property = new GameProfile.Property(
-              "publicKey", expiresAt.toEpochMilli() + keyString, signature
+          "publicKey", expiresAt.toEpochMilli() + keyString, signature
       );
 
       if (property.getSignature().isEmpty()) {
