@@ -28,7 +28,7 @@ import java.util.Map;
 public class ChatCommandPacket extends GenericChatPacket {
 
   private Instant timeStamp;
-  private ArgumentSignatures argumentSignatures;
+  private ArgumentSignatures argumentSignatures = ArgumentSignatures.EMPTY;
 
   public ChatCommandPacket() {
     this.commandPacket = true;
@@ -36,6 +36,14 @@ public class ChatCommandPacket extends GenericChatPacket {
 
   public Instant getTimeStamp() {
     return timeStamp;
+  }
+
+  public void setArgumentSignatures(ArgumentSignatures argumentSignatures) {
+    this.argumentSignatures = argumentSignatures;
+  }
+
+  public ArgumentSignatures getArgumentSignatures() {
+    return argumentSignatures;
   }
 
   public void setTimeStamp(Instant timeStamp) {
@@ -72,11 +80,11 @@ public class ChatCommandPacket extends GenericChatPacket {
   }
 
   public static class ArgumentSignatures {
-
+    public static final ArgumentSignatures EMPTY = new ArgumentSignatures(0L, Map.of());
     private final long salt;
     private final Map<String, byte[]> signatureMap;
 
-    public ArgumentSignatures(long salt, Map<String, byte[]> signatureMap) {
+    ArgumentSignatures(long salt, Map<String, byte[]> signatureMap) {
       this.salt = salt;
       this.signatureMap = signatureMap;
     }

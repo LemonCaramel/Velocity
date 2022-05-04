@@ -45,7 +45,7 @@ public class SystemChatPacket extends GenericChatPacket {
   @Override
   public void encode(ByteBuf buf, ProtocolUtils.Direction direction, ProtocolVersion version) {
     super.encode(buf, direction, version);
-    buf.writeByte(type);
+    ProtocolUtils.writeVarInt(buf, type);
   }
 
   @Override

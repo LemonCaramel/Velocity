@@ -18,11 +18,14 @@
 package com.velocitypowered.proxy.protocol.packet;
 
 import com.velocitypowered.api.network.ProtocolVersion;
+import com.velocitypowered.api.util.GameProfile;
 import com.velocitypowered.api.util.UuidUtils;
 import com.velocitypowered.proxy.connection.MinecraftSessionHandler;
 import com.velocitypowered.proxy.protocol.MinecraftPacket;
 import com.velocitypowered.proxy.protocol.ProtocolUtils;
 import io.netty.buffer.ByteBuf;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 import org.checkerframework.checker.nullness.qual.Nullable;
 
@@ -30,6 +33,7 @@ public class ServerLoginSuccess implements MinecraftPacket {
 
   private @Nullable UUID uuid;
   private @Nullable String username;
+  private @Nullable List<GameProfile.Property> properties;
 
   public UUID getUuid() {
     if (uuid == null) {
@@ -53,11 +57,20 @@ public class ServerLoginSuccess implements MinecraftPacket {
     this.username = username;
   }
 
+  public @Nullable List<GameProfile.Property> getProperties() {
+    return properties;
+  }
+
+  public void setProperties(List<GameProfile.Property> properties) {
+    this.properties = properties;
+  }
+
   @Override
   public String toString() {
     return "ServerLoginSuccess{"
         + "uuid=" + uuid
         + ", username='" + username + '\''
+        + ", properties=" + properties
         + '}';
   }
 
@@ -72,7 +85,14 @@ public class ServerLoginSuccess implements MinecraftPacket {
     }
     username = ProtocolUtils.readString(buf, 16);
     if (version.compareTo(ProtocolVersion.MINECRAFT_1_19) >= 0) {
-      ProtocolUtils.readVarInt(buf);  // No property
+      final int size = ProtocolUtils.readVarInt(buf);
+      this.properties = new ArrayList<>(size);
+      for (int index = 0; index < size; ++index) {
+        final String name = ProtocolUtils.readString(buf);
+        final String value = ProtocolUtils.readString(buf);
+        final String signature = buf.readBoolean() ? ProtocolUtils.readString(buf) : null;
+        this.properties.add(new GameProfile.Property(name, value, signature));
+      }
     }
   }
 
@@ -93,7 +113,22 @@ public class ServerLoginSuccess implements MinecraftPacket {
     }
     ProtocolUtils.writeString(buf, username);
     if (version.compareTo(ProtocolVersion.MINECRAFT_1_19) >= 0) {
-      ProtocolUtils.writeVarInt(buf, 0); // No property
+      if (this.properties == null) {
+        ProtocolUtils.writeVarInt(buf, 0); // No property
+      } else {
+        final int size = this.properties.size();
+        ProtocolUtils.writeVarInt(buf, size);
+        for (GameProfile.Property property : this.properties) {
+          ProtocolUtils.writeString(buf, property.getName());
+          ProtocolUtils.writeString(buf, property.getValue());
+          if (property.hasSignature()) {
+            buf.writeBoolean(true);
+            ProtocolUtils.writeString(buf, property.getSignature());
+          } else {
+            buf.writeBoolean(false);
+          }
+        }
+      }
     }
   }
 

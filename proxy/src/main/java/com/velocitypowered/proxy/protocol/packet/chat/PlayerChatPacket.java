@@ -72,7 +72,7 @@ public class PlayerChatPacket extends GenericChatPacket {
   public void decode(ByteBuf buf, ProtocolUtils.Direction direction, ProtocolVersion version) {
     super.decode(buf, direction, version);
     if (direction == ProtocolUtils.Direction.CLIENTBOUND) {
-      this.type = buf.readByte();
+      this.type = ProtocolUtils.readVarInt(buf);
       this.sender = ChatSender.decode(buf);
     }
     this.timeStamp = Instant.ofEpochSecond(buf.readLong());
@@ -83,7 +83,7 @@ public class PlayerChatPacket extends GenericChatPacket {
   public void encode(ByteBuf buf, ProtocolUtils.Direction direction, ProtocolVersion version) {
     super.encode(buf, direction, version);
     if (direction == ProtocolUtils.Direction.CLIENTBOUND) {
-      buf.writeByte(type);
+      ProtocolUtils.writeVarInt(buf, type);
       if (sender == null) {
         throw new IllegalStateException("Sender is not specified");
       }
@@ -101,19 +101,29 @@ public class PlayerChatPacket extends GenericChatPacket {
   public static class ChatSender {
     public final UUID uuid;
     public final String name;
+    public final @Nullable String teamName;
 
-    public ChatSender(UUID uuid, String component) {
+    ChatSender(UUID uuid, String component, @Nullable String teamName) {
       this.uuid = uuid;
       this.name = component;
+      this.teamName = teamName;
     }
 
-    public static void encode(ByteBuf buf, ChatSender sender) {
+    private static void encode(ByteBuf buf, ChatSender sender) {
       ProtocolUtils.writeUuid(buf, sender.uuid);
       ProtocolUtils.writeString(buf, sender.name);
+      boolean hasTeamName = (sender.teamName != null);
+      buf.writeBoolean(hasTeamName);
+      if (hasTeamName) {
+        ProtocolUtils.writeString(buf, sender.teamName);
+      }
     }
 
-    public static ChatSender decode(ByteBuf buf) {
-      return new ChatSender(ProtocolUtils.readUuid(buf), ProtocolUtils.readString(buf));
+    private static ChatSender decode(ByteBuf buf) {
+      UUID uuid = ProtocolUtils.readUuid(buf);
+      String name = ProtocolUtils.readString(buf);
+      String teamName = buf.readBoolean() ? ProtocolUtils.readString(buf) : null;
+      return new ChatSender(uuid, name, teamName);
     }
 
     @Override
@@ -121,6 +131,7 @@ public class PlayerChatPacket extends GenericChatPacket {
       return "ChatSender{"
           + "uuid=" + uuid
           + ", name='" + name + '\''
+          + ", teamName='" + teamName + '\''
           + '}';
     }
   }

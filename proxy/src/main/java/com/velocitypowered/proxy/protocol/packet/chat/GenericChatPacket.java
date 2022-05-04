@@ -115,7 +115,8 @@ public abstract class GenericChatPacket implements MinecraftPacket {
    */
   public static GenericChatPacket createClientbound(Identity identity, Component component,
                       ProtocolVersion version) {
-    return createClientbound(component, CHAT_TYPE, identity.uuid(), version);
+    return createClientbound(component, identity.equals(Identity.nil()) ? SYSTEM_TYPE : CHAT_TYPE,
+            identity.uuid(), version);
   }
 
   /**
@@ -167,12 +168,19 @@ public abstract class GenericChatPacket implements MinecraftPacket {
    */
   public static GenericChatPacket createServerbound(ProtocolVersion version, String message) {
     if (version.compareTo(ProtocolVersion.MINECRAFT_1_19) >= 0) {
-      PlayerChatPacket packet = new PlayerChatPacket();
-      packet.setMessage(message);
-      packet.setType(CHAT_TYPE);
-      packet.setTimeStamp(Instant.now());
-      packet.setSaltSignature(EncryptionResponse.SaltSignature.EMPTY);
-      return packet;
+      if (message.startsWith("/")) {
+        ChatCommandPacket packet = new ChatCommandPacket();
+        packet.setMessage(message.substring(1));
+        packet.setTimeStamp(Instant.now());
+        return packet;
+      } else {
+        PlayerChatPacket packet = new PlayerChatPacket();
+        packet.setMessage(message);
+        packet.setType(CHAT_TYPE);
+        packet.setTimeStamp(Instant.now());
+        packet.setSaltSignature(EncryptionResponse.SaltSignature.EMPTY);
+        return packet;
+      }
     } else {
       LegacyChatPacket packet = new LegacyChatPacket();
       packet.setMessage(message);
