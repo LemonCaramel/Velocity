@@ -17,6 +17,8 @@
 
 package com.velocitypowered.proxy.protocol.packet;
 
+import static com.velocitypowered.api.network.ProtocolVersion.MINECRAFT_1_19;
+
 import com.google.common.collect.ImmutableList;
 import com.velocitypowered.api.network.ProtocolVersion;
 import com.velocitypowered.api.proxy.player.TabListEntry;
@@ -28,6 +30,8 @@ import io.netty.buffer.ByteBuf;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import net.kyori.adventure.nbt.BinaryTagIO;
+import net.kyori.adventure.nbt.CompoundBinaryTag;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 import org.checkerframework.checker.nullness.qual.Nullable;
@@ -74,6 +78,7 @@ public class PlayerListItem implements MinecraftPacket {
             item.setGameMode(ProtocolUtils.readVarInt(buf));
             item.setLatency(ProtocolUtils.readVarInt(buf));
             item.setDisplayName(readOptionalComponent(buf, version));
+            item.setPublicKey(readOptionalPublicKey(buf, version));
             break;
           case UPDATE_GAMEMODE:
             item.setGameMode(ProtocolUtils.readVarInt(buf));
@@ -108,6 +113,13 @@ public class PlayerListItem implements MinecraftPacket {
     return null;
   }
 
+  private static @Nullable CompoundBinaryTag readOptionalPublicKey(ByteBuf buf, ProtocolVersion version) {
+    if (version.compareTo(MINECRAFT_1_19) >= 0 && buf.readBoolean()) {
+      return ProtocolUtils.readCompoundTag(buf, BinaryTagIO.reader());
+    }
+    return null;
+  }
+
   @Override
   public void encode(ByteBuf buf, ProtocolUtils.Direction direction, ProtocolVersion version) {
     if (version.compareTo(ProtocolVersion.MINECRAFT_1_8) >= 0) {
@@ -126,6 +138,7 @@ public class PlayerListItem implements MinecraftPacket {
             ProtocolUtils.writeVarInt(buf, item.getLatency());
 
             writeDisplayName(buf, item.getDisplayName(), version);
+            writePublicKey(buf, item.getPublicKey(), version);
             break;
           case UPDATE_GAMEMODE:
             ProtocolUtils.writeVarInt(buf, item.getGameMode());
@@ -173,6 +186,16 @@ public class PlayerListItem implements MinecraftPacket {
     }
   }
 
+  private void writePublicKey(ByteBuf buf, @Nullable CompoundBinaryTag publicKey,
+      ProtocolVersion version) {
+    if (version.compareTo(MINECRAFT_1_19) >= 0) {
+      buf.writeBoolean(publicKey != null);
+      if (publicKey != null) {
+        ProtocolUtils.writeCompoundTag(buf, publicKey);
+      }
+    }
+  }
+
   public static class Item {
 
     private final UUID uuid;
@@ -181,6 +204,7 @@ public class PlayerListItem implements MinecraftPacket {
     private int gameMode;
     private int latency;
     private @Nullable Component displayName;
+    private @Nullable CompoundBinaryTag publicKey;
 
     public Item() {
       uuid = null;
@@ -245,6 +269,15 @@ public class PlayerListItem implements MinecraftPacket {
 
     public Item setDisplayName(@Nullable Component displayName) {
       this.displayName = displayName;
+      return this;
+    }
+
+    public @Nullable CompoundBinaryTag getPublicKey() {
+      return publicKey;
+    }
+
+    public Item setPublicKey(@Nullable CompoundBinaryTag publicKey) {
+      this.publicKey = publicKey;
       return this;
     }
   }

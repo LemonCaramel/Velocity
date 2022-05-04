@@ -32,13 +32,14 @@ public class SystemChatPacket extends GenericChatPacket {
     return "SystemChatPacket{"
         + "message='" + message + '\''
         + ", type=" + type
+        + ", commandPacket=" + commandPacket
         + '}';
   }
 
   @Override
   public void decode(ByteBuf buf, ProtocolUtils.Direction direction, ProtocolVersion version) {
     super.decode(buf, direction, version);
-    type = buf.readByte();
+    type = ProtocolUtils.readVarInt(buf);
   }
 
   @Override

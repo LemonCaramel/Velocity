@@ -47,6 +47,7 @@ public class LegacyChatPacket extends GenericChatPacket {
     return "LegacyChatPacket{"
         + "type=" + type
         + ", message='" + message + '\''
+        + ", commandPacket=" + commandPacket
         + ", sender=" + sender
         + '}';
   }

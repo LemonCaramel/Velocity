@@ -61,6 +61,7 @@ public class PlayerChatPacket extends GenericChatPacket {
     return "PlayerChatPacket{"
         + "type=" + type
         + ", message='" + message + '\''
+        + ", commandPacket=" + commandPacket
         + ", sender=" + sender
         + ", timeStamp=" + timeStamp
         + ", saltSignature=" + saltSignature
@@ -69,23 +70,17 @@ public class PlayerChatPacket extends GenericChatPacket {
 
   @Override
   public void decode(ByteBuf buf, ProtocolUtils.Direction direction, ProtocolVersion version) {
-    if (direction == ProtocolUtils.Direction.SERVERBOUND) {
-      this.timeStamp = Instant.ofEpochSecond(buf.readLong());
-    }
     super.decode(buf, direction, version);
     if (direction == ProtocolUtils.Direction.CLIENTBOUND) {
       this.type = buf.readByte();
       this.sender = ChatSender.decode(buf);
-      this.timeStamp = Instant.ofEpochSecond(buf.readLong());
     }
+    this.timeStamp = Instant.ofEpochSecond(buf.readLong());
     this.saltSignature = EncryptionResponse.SaltSignature.decode(buf);
   }
 
   @Override
   public void encode(ByteBuf buf, ProtocolUtils.Direction direction, ProtocolVersion version) {
-    if (direction == ProtocolUtils.Direction.SERVERBOUND) {
-      buf.writeLong(this.timeStamp.getEpochSecond());
-    }
     super.encode(buf, direction, version);
     if (direction == ProtocolUtils.Direction.CLIENTBOUND) {
       buf.writeByte(type);
@@ -93,8 +88,8 @@ public class PlayerChatPacket extends GenericChatPacket {
         throw new IllegalStateException("Sender is not specified");
       }
       ChatSender.encode(buf, this.sender);
-      buf.writeLong(this.timeStamp.getEpochSecond());
     }
+    buf.writeLong(this.timeStamp.getEpochSecond());
     EncryptionResponse.SaltSignature.encode(buf, this.saltSignature);
   }
 

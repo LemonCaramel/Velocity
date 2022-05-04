@@ -40,8 +40,9 @@ public abstract class GenericChatPacket implements MinecraftPacket {
   public static final byte SYSTEM_TYPE = (byte) 1;
   public static final byte GAME_INFO_TYPE = (byte) 2;
 
-  protected byte type;
+  protected int type;
   protected @Nullable String message;
+  protected boolean commandPacket;
 
   /**
    * Get chat message.
@@ -69,7 +70,7 @@ public abstract class GenericChatPacket implements MinecraftPacket {
    *
    * @return the message type
    */
-  public byte getType() {
+  public int getType() {
     return type;
   }
 
@@ -78,8 +79,17 @@ public abstract class GenericChatPacket implements MinecraftPacket {
    *
    * @param type the message type
    */
-  public void setType(byte type) {
+  public void setType(int type) {
     this.type = type;
+  }
+
+  /**
+   * Returns whether a command packet (1.19+).
+   *
+   * @return if {@code true}, this packet is command packet
+   */
+  public boolean isCommandPacket() {
+    return commandPacket;
   }
 
   @Override

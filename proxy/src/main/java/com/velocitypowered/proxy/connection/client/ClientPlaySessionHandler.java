@@ -159,9 +159,9 @@ public class ClientPlaySessionHandler implements MinecraftSessionHandler {
       return true;
     }
 
-    if (msg.startsWith("/")) {
-      String originalCommand = msg.substring(1);
-      server.getCommandManager().callCommandEvent(player, msg.substring(1))
+    if (packet.isCommandPacket() || msg.startsWith("/")) {
+      String originalCommand = packet.isCommandPacket() ? msg : msg.substring(1);
+      server.getCommandManager().callCommandEvent(player, originalCommand)
           .thenComposeAsync(event -> processCommandExecuteResult(originalCommand,
               event.getResult()))
           .whenComplete((ignored, throwable) -> {

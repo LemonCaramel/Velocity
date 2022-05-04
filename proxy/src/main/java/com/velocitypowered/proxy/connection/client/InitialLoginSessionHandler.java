@@ -199,7 +199,7 @@ public class InitialLoginSessionHandler implements MinecraftSessionHandler {
       if (mcConnection.getProtocolVersion().compareTo(MINECRAFT_1_19) >= 0) {
         final PublicKey publickey = EncryptionUtils.stringToRsaPublicKey(this.publicKey);
         if (packet.getSaltSignature() != null) {
-          final Signature verifySig = Signature.getInstance("SHA1withRSA");
+          final Signature verifySig = Signature.getInstance("SHA256withRSA");
           verifySig.initVerify(publickey);
           verifySig.update(this.verify);
           verifySig.update(packet.getSaltSignature().saltAsBytes());
