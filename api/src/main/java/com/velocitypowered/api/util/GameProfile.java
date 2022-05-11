@@ -11,7 +11,6 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import java.util.List;
 import java.util.UUID;
-import org.checkerframework.checker.nullness.qual.Nullable;
 
 /**
  * Represents a Mojang game profile. This class is immutable.
@@ -180,7 +179,7 @@ public final class GameProfile {
 
     private final String name;
     private final String value;
-    private final @Nullable String signature;
+    private final String signature;
 
     /**
      * Creates a profile property entry.
@@ -191,7 +190,7 @@ public final class GameProfile {
     public Property(String name, String value, String signature) {
       this.name = Preconditions.checkNotNull(name, "name");
       this.value = Preconditions.checkNotNull(value, "value");
-      this.signature = signature;
+      this.signature = Preconditions.checkNotNull(signature, "signature");
     }
 
     public String getName() {
@@ -202,12 +201,8 @@ public final class GameProfile {
       return value;
     }
 
-    public @Nullable String getSignature() {
+    public String getSignature() {
       return signature;
-    }
-
-    public boolean hasSignature() {
-      return signature != null;
     }
 
     @Override

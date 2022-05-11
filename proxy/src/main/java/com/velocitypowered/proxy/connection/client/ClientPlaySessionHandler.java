@@ -628,8 +628,8 @@ public class ClientPlaySessionHandler implements MinecraftSessionHandler {
     MinecraftConnection smc = player.ensureAndGetCurrentServer().ensureConnected();
     String commandToRun = result.getCommand().orElse(originalCommand);
     if (result.isForwardToServer()) {
-      return CompletableFuture.runAsync(() -> smc.write(GenericChatPacket.createServerbound(player.getProtocolVersion(),
-          "/" + commandToRun)), smc.eventLoop());
+      return CompletableFuture.runAsync(() -> smc.write(GenericChatPacket.createServerbound(
+          player.getProtocolVersion(), "/" + commandToRun)), smc.eventLoop());
     } else {
       return server.getCommandManager().executeImmediatelyAsync(player, commandToRun)
           .thenAcceptAsync(hasRun -> {

@@ -24,7 +24,6 @@ import com.velocitypowered.proxy.connection.MinecraftSessionHandler;
 import com.velocitypowered.proxy.protocol.MinecraftPacket;
 import com.velocitypowered.proxy.protocol.ProtocolUtils;
 import io.netty.buffer.ByteBuf;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import org.checkerframework.checker.nullness.qual.Nullable;
@@ -85,14 +84,7 @@ public class ServerLoginSuccess implements MinecraftPacket {
     }
     username = ProtocolUtils.readString(buf, 16);
     if (version.compareTo(ProtocolVersion.MINECRAFT_1_19) >= 0) {
-      final int size = ProtocolUtils.readVarInt(buf);
-      this.properties = new ArrayList<>(size);
-      for (int index = 0; index < size; ++index) {
-        final String name = ProtocolUtils.readString(buf);
-        final String value = ProtocolUtils.readString(buf);
-        final String signature = buf.readBoolean() ? ProtocolUtils.readString(buf) : null;
-        this.properties.add(new GameProfile.Property(name, value, signature));
-      }
+      this.properties = ProtocolUtils.readProperties(buf);
     }
   }
 
@@ -114,20 +106,9 @@ public class ServerLoginSuccess implements MinecraftPacket {
     ProtocolUtils.writeString(buf, username);
     if (version.compareTo(ProtocolVersion.MINECRAFT_1_19) >= 0) {
       if (this.properties == null) {
-        ProtocolUtils.writeVarInt(buf, 0); // No property
+        ProtocolUtils.writeVarInt(buf, 0); // No property - Size 0
       } else {
-        final int size = this.properties.size();
-        ProtocolUtils.writeVarInt(buf, size);
-        for (GameProfile.Property property : this.properties) {
-          ProtocolUtils.writeString(buf, property.getName());
-          ProtocolUtils.writeString(buf, property.getValue());
-          if (property.hasSignature()) {
-            buf.writeBoolean(true);
-            ProtocolUtils.writeString(buf, property.getSignature());
-          } else {
-            buf.writeBoolean(false);
-          }
-        }
+        ProtocolUtils.writeProperties(buf, this.properties);
       }
     }
   }
