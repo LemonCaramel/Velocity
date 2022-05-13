@@ -63,15 +63,15 @@ public class ChatCommandPacket extends GenericChatPacket {
   @Override
   public void decode(ByteBuf buf, ProtocolUtils.Direction direction, ProtocolVersion version) {
     this.message = ProtocolUtils.readString(buf, MAX_SERVERBOUND_MESSAGE_LENGTH); // Command
-    this.timeStamp = Instant.ofEpochSecond(buf.readLong());
+    this.timeStamp = Instant.ofEpochMilli(buf.readLong());
     this.argumentSignatures = ArgumentSignatures.decode(buf);
   }
 
   @Override
   public void encode(ByteBuf buf, ProtocolUtils.Direction direction, ProtocolVersion version) {
     super.encode(buf, direction, version); // Command
-    buf.writeLong(this.timeStamp.getEpochSecond());
-    ArgumentSignatures.encode(buf, this.argumentSignatures);
+    buf.writeLong(timeStamp.toEpochMilli());
+    ArgumentSignatures.encode(buf, argumentSignatures);
   }
 
   @Override

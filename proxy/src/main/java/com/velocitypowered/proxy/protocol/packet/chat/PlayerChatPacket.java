@@ -28,9 +28,19 @@ import org.checkerframework.checker.nullness.qual.Nullable;
 
 public class PlayerChatPacket extends GenericChatPacket {
 
+  protected @Nullable String unsignedMessage;
   private @Nullable ChatSender sender;
   private Instant timeStamp;
-  public EncryptionResponse.SaltSignature saltSignature;
+  private EncryptionResponse.SaltSignature saltSignature;
+  private boolean previewSigned;
+
+  public String getUnsignedMessage() {
+    return unsignedMessage;
+  }
+
+  public void setUnsignedMessage(String unsignedMessage) {
+    this.unsignedMessage = unsignedMessage;
+  }
 
   public ChatSender getSender() {
     return sender;
@@ -56,15 +66,25 @@ public class PlayerChatPacket extends GenericChatPacket {
     this.saltSignature = saltSignature;
   }
 
+  public boolean isPreviewSigned() {
+    return previewSigned;
+  }
+
+  public void setPreviewSigned(boolean previewSigned) {
+    this.previewSigned = previewSigned;
+  }
+
   @Override
   public String toString() {
     return "PlayerChatPacket{"
         + "type=" + type
         + ", message='" + message + '\''
         + ", commandPacket=" + commandPacket
+        + ", unsignedMessage='" + unsignedMessage + '\''
         + ", sender=" + sender
         + ", timeStamp=" + timeStamp
         + ", saltSignature=" + saltSignature
+        + ", previewSigned=" + previewSigned
         + '}';
   }
 
@@ -72,25 +92,40 @@ public class PlayerChatPacket extends GenericChatPacket {
   public void decode(ByteBuf buf, ProtocolUtils.Direction direction, ProtocolVersion version) {
     super.decode(buf, direction, version);
     if (direction == ProtocolUtils.Direction.CLIENTBOUND) {
+      if (buf.readBoolean()) {
+        this.unsignedMessage = ProtocolUtils.readString(buf);
+      }
       this.type = ProtocolUtils.readVarInt(buf);
       this.sender = ChatSender.decode(buf);
     }
-    this.timeStamp = Instant.ofEpochSecond(buf.readLong());
+    this.timeStamp = Instant.ofEpochMilli(buf.readLong());
     this.saltSignature = EncryptionResponse.SaltSignature.decode(buf);
+    if (direction == ProtocolUtils.Direction.SERVERBOUND) {
+      this.previewSigned = buf.readBoolean();
+    }
   }
 
   @Override
   public void encode(ByteBuf buf, ProtocolUtils.Direction direction, ProtocolVersion version) {
     super.encode(buf, direction, version);
     if (direction == ProtocolUtils.Direction.CLIENTBOUND) {
+      if (unsignedMessage == null) {
+        buf.writeBoolean(false);
+      } else {
+        buf.writeBoolean(true);
+        ProtocolUtils.writeString(buf, unsignedMessage);
+      }
       ProtocolUtils.writeVarInt(buf, type);
       if (sender == null) {
         throw new IllegalStateException("Sender is not specified");
       }
-      ChatSender.encode(buf, this.sender);
+      ChatSender.encode(buf, sender);
     }
-    buf.writeLong(this.timeStamp.getEpochSecond());
-    EncryptionResponse.SaltSignature.encode(buf, this.saltSignature);
+    buf.writeLong(timeStamp.toEpochMilli());
+    EncryptionResponse.SaltSignature.encode(buf, saltSignature);
+    if (direction == ProtocolUtils.Direction.SERVERBOUND) {
+      buf.writeBoolean(previewSigned);
+    }
   }
 
   @Override

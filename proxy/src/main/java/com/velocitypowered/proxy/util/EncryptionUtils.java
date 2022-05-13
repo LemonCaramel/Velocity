@@ -18,8 +18,6 @@
 package com.velocitypowered.proxy.util;
 
 import com.velocitypowered.api.util.GameProfile;
-import java.io.ByteArrayOutputStream;
-import java.io.InputStream;
 import java.math.BigInteger;
 import java.security.GeneralSecurityException;
 import java.security.InvalidKeyException;
@@ -37,20 +35,15 @@ import javax.crypto.Cipher;
 
 public enum EncryptionUtils {
   ;
+  public static final String RSA_PUBLIC_KEY_HEADER = "-----BEGIN RSA PUBLIC KEY-----";
+  public static final String RSA_PUBLIC_KEY_FOOTER = "-----END RSA PUBLIC KEY-----";
+  public static final String LINE_SEPARATOR = "\n";
   private static final PublicKey SIGNATURE_KEY;
 
   static {
-    try (InputStream in = EncryptionUtils.class.getResourceAsStream("/yggdrasil_session_pubkey.der")) {
-      final ByteArrayOutputStream out = new ByteArrayOutputStream();
-
-      byte[] buffer = new byte[4096];
-      int length;
-      while ((length = in.read(buffer)) != -1) {
-        out.write(buffer, 0, length);
-      }
-      out.close();
-
-      SIGNATURE_KEY = KeyFactory.getInstance("RSA").generatePublic(new X509EncodedKeySpec(out.toByteArray()));
+    try {
+      byte[] keyBytes = EncryptionUtils.class.getResourceAsStream("/yggdrasil_session_pubkey.der").readAllBytes();
+      SIGNATURE_KEY = KeyFactory.getInstance("RSA").generatePublic(new X509EncodedKeySpec(keyBytes));
     } catch (Exception e) {
       throw new ExceptionInInitializerError("Can't read the yggdrasil public key.");
     }
@@ -133,26 +126,15 @@ public enum EncryptionUtils {
   }
 
   /**
-   * String public key to RSA public key.
+   * Generates RSA public keys using an encoded byte array.
    *
-   * @param publicKey string key
+   * @param encodedKey encoded byte array key
    * @return the rsa public key
    */
-  public static PublicKey stringToRsaPublicKey(String publicKey) {
-    final String begin = "-----BEGIN RSA PUBLIC KEY-----";
-    final String end = "-----END RSA PUBLIC KEY-----";
-
-    int startIndex = publicKey.indexOf(begin);
-    if (startIndex != -1) {
-      startIndex += begin.length();
-      int endIndex = publicKey.indexOf(end, startIndex);
-
-      publicKey = publicKey.substring(startIndex, endIndex + 1);
-    }
-
+  public static PublicKey generateRsaPublicKey(byte[] encodedKey) {
     try {
       return KeyFactory.getInstance("RSA").generatePublic(
-          new X509EncodedKeySpec(Base64.getMimeDecoder().decode(publicKey))
+          new X509EncodedKeySpec(encodedKey)
       );
     } catch (Exception exception) {
       throw new IllegalStateException(exception);

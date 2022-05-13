@@ -94,7 +94,7 @@ public abstract class GenericChatPacket implements MinecraftPacket {
 
   @Override
   public void decode(ByteBuf buf, ProtocolUtils.Direction direction, ProtocolVersion version) {
-    message = ProtocolUtils.readString(buf);
+    this.message = ProtocolUtils.readString(buf);
   }
 
   @Override

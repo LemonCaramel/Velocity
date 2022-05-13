@@ -21,6 +21,9 @@ import static com.google.common.net.UrlEscapers.urlFormParameterEscaper;
 import static com.velocitypowered.api.network.ProtocolVersion.MINECRAFT_1_19;
 import static com.velocitypowered.proxy.VelocityServer.GENERAL_GSON;
 import static com.velocitypowered.proxy.connection.VelocityConstants.EMPTY_BYTE_ARRAY;
+import static com.velocitypowered.proxy.util.EncryptionUtils.LINE_SEPARATOR;
+import static com.velocitypowered.proxy.util.EncryptionUtils.RSA_PUBLIC_KEY_FOOTER;
+import static com.velocitypowered.proxy.util.EncryptionUtils.RSA_PUBLIC_KEY_HEADER;
 import static com.velocitypowered.proxy.util.EncryptionUtils.decryptRsa;
 import static com.velocitypowered.proxy.util.EncryptionUtils.generateServerId;
 
@@ -39,6 +42,7 @@ import com.velocitypowered.proxy.protocol.packet.ServerLogin;
 import com.velocitypowered.proxy.util.EncryptionUtils;
 import io.netty.buffer.ByteBuf;
 import java.net.InetSocketAddress;
+import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
 import java.security.KeyPair;
 import java.security.MessageDigest;
@@ -46,10 +50,11 @@ import java.security.PublicKey;
 import java.security.Signature;
 import java.time.Instant;
 import java.util.Arrays;
+import java.util.Base64;
+import java.util.Base64.Encoder;
 import java.util.Optional;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ThreadLocalRandom;
-import net.kyori.adventure.nbt.CompoundBinaryTag;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.apache.logging.log4j.LogManager;
@@ -61,6 +66,8 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
 public class InitialLoginSessionHandler implements MinecraftSessionHandler {
 
   private static final Logger logger = LogManager.getLogger(InitialLoginSessionHandler.class);
+  private static final Encoder MIME_ENCODER = Base64.getMimeEncoder(76,
+      LINE_SEPARATOR.getBytes(StandardCharsets.UTF_8));
   private static final String MOJANG_HASJOINED_URL =
       System.getProperty("mojang.sessionserver", "https://sessionserver.mojang.com/session/minecraft/hasJoined")
           .concat("?username=%s&serverId=%s");
@@ -70,7 +77,7 @@ public class InitialLoginSessionHandler implements MinecraftSessionHandler {
   private final LoginInboundConnection inbound;
   private @MonotonicNonNull ServerLogin login;
   private byte[] verify = EMPTY_BYTE_ARRAY;
-  private String publicKey = "";
+  private PublicKey publicKey = null;
   private LoginState currentState = LoginState.LOGIN_PACKET_EXPECTED;
 
   InitialLoginSessionHandler(VelocityServer server, MinecraftConnection mcConnection,
@@ -87,15 +94,17 @@ public class InitialLoginSessionHandler implements MinecraftSessionHandler {
     this.login = packet;
 
     if (mcConnection.getProtocolVersion().compareTo(MINECRAFT_1_19) >= 0) {
-      final CompoundBinaryTag publicKey = this.login.getPublicKey();
+      final ServerLogin.PublicKeyData publicKey = this.login.getPublicKey();
       if (publicKey == null) {
         inbound.disconnect(Component.translatable("multiplayer.disconnect.missing_public_key"));
         return true;
       }
 
-      final Instant expiresAt = Instant.parse(publicKey.getString("expires_at"));
-      final String keyString = publicKey.getString("key");
-      final String signature = publicKey.getString("signature");
+      final Instant expiresAt = publicKey.expiresAt;
+      final String keyString = RSA_PUBLIC_KEY_HEADER + LINE_SEPARATOR
+            + MIME_ENCODER.encodeToString(publicKey.key.getEncoded())
+            + LINE_SEPARATOR + RSA_PUBLIC_KEY_FOOTER + LINE_SEPARATOR;
+      final String signature = Base64.getEncoder().encodeToString(publicKey.keySig);
       final GameProfile.Property property = new GameProfile.Property(
           "publicKey", expiresAt.toEpochMilli() + keyString, signature
       );
@@ -122,7 +131,7 @@ public class InitialLoginSessionHandler implements MinecraftSessionHandler {
         return true;
       }
 
-      this.publicKey = keyString;
+      this.publicKey = publicKey.key;
     }
 
     PreLoginEvent event = new PreLoginEvent(inbound, login.getUsername());
@@ -197,10 +206,13 @@ public class InitialLoginSessionHandler implements MinecraftSessionHandler {
 
       // Minecraft 1.19+ Login process
       if (mcConnection.getProtocolVersion().compareTo(MINECRAFT_1_19) >= 0) {
-        final PublicKey publickey = EncryptionUtils.stringToRsaPublicKey(this.publicKey);
         if (packet.getSaltSignature() != null) {
+          if (this.publicKey == null) {
+            inbound.disconnect(Component.translatable("multiplayer.disconnect.missing_public_key"));
+            return true;
+          }
           final Signature verifySig = Signature.getInstance("SHA256withRSA");
-          verifySig.initVerify(publickey);
+          verifySig.initVerify(this.publicKey);
           verifySig.update(this.verify);
           verifySig.update(packet.getSaltSignature().saltAsBytes());
           if (!verifySig.verify(packet.getSaltSignature().signature)) {

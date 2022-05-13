@@ -25,13 +25,12 @@ import com.velocitypowered.api.proxy.player.TabListEntry;
 import com.velocitypowered.api.util.GameProfile;
 import com.velocitypowered.proxy.connection.MinecraftSessionHandler;
 import com.velocitypowered.proxy.protocol.MinecraftPacket;
+import com.velocitypowered.proxy.protocol.packet.ServerLogin.PublicKeyData;
 import com.velocitypowered.proxy.protocol.ProtocolUtils;
 import io.netty.buffer.ByteBuf;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
-import net.kyori.adventure.nbt.BinaryTagIO;
-import net.kyori.adventure.nbt.CompoundBinaryTag;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 import org.checkerframework.checker.nullness.qual.Nullable;
@@ -113,9 +112,9 @@ public class PlayerListItem implements MinecraftPacket {
     return null;
   }
 
-  private static @Nullable CompoundBinaryTag readOptionalPublicKey(ByteBuf buf, ProtocolVersion version) {
+  private static @Nullable PublicKeyData readOptionalPublicKey(ByteBuf buf, ProtocolVersion version) {
     if (version.compareTo(MINECRAFT_1_19) >= 0 && buf.readBoolean()) {
-      return ProtocolUtils.readCompoundTag(buf, BinaryTagIO.reader());
+      return PublicKeyData.decode(buf);
     }
     return null;
   }
@@ -186,12 +185,11 @@ public class PlayerListItem implements MinecraftPacket {
     }
   }
 
-  private void writePublicKey(ByteBuf buf, @Nullable CompoundBinaryTag publicKey,
-      ProtocolVersion version) {
+  private void writePublicKey(ByteBuf buf, @Nullable PublicKeyData publicKey, ProtocolVersion version) {
     if (version.compareTo(MINECRAFT_1_19) >= 0) {
       buf.writeBoolean(publicKey != null);
       if (publicKey != null) {
-        ProtocolUtils.writeCompoundTag(buf, publicKey);
+        PublicKeyData.encode(buf, publicKey);
       }
     }
   }
@@ -204,7 +202,7 @@ public class PlayerListItem implements MinecraftPacket {
     private int gameMode;
     private int latency;
     private @Nullable Component displayName;
-    private @Nullable CompoundBinaryTag publicKey;
+    private @Nullable PublicKeyData publicKey;
 
     public Item() {
       uuid = null;
@@ -272,11 +270,11 @@ public class PlayerListItem implements MinecraftPacket {
       return this;
     }
 
-    public @Nullable CompoundBinaryTag getPublicKey() {
+    public @Nullable PublicKeyData getPublicKey() {
       return publicKey;
     }
 
-    public Item setPublicKey(@Nullable CompoundBinaryTag publicKey) {
+    public Item setPublicKey(@Nullable PublicKeyData publicKey) {
       this.publicKey = publicKey;
       return this;
     }

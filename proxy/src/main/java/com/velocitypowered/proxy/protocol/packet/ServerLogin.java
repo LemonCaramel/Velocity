@@ -23,18 +23,20 @@ import com.velocitypowered.proxy.connection.MinecraftSessionHandler;
 import com.velocitypowered.proxy.protocol.MinecraftPacket;
 import com.velocitypowered.proxy.protocol.ProtocolUtils;
 import com.velocitypowered.proxy.protocol.ProtocolUtils.Direction;
+import com.velocitypowered.proxy.util.EncryptionUtils;
 import com.velocitypowered.proxy.util.except.QuietDecoderException;
 import io.netty.buffer.ByteBuf;
-import net.kyori.adventure.nbt.BinaryTagIO;
-import net.kyori.adventure.nbt.CompoundBinaryTag;
 import org.checkerframework.checker.nullness.qual.Nullable;
+import java.security.PublicKey;
+import java.time.Instant;
+import java.util.Arrays;
 
 public class ServerLogin implements MinecraftPacket {
 
   private static final QuietDecoderException EMPTY_USERNAME = new QuietDecoderException("Empty username!");
 
   private @Nullable String username;
-  private @Nullable CompoundBinaryTag publicKey;
+  private @Nullable PublicKeyData publicKey;
 
   public ServerLogin() {
   }
@@ -50,7 +52,7 @@ public class ServerLogin implements MinecraftPacket {
     return username;
   }
 
-  public CompoundBinaryTag getPublicKey() {
+  public PublicKeyData getPublicKey() {
     return publicKey;
   }
 
@@ -70,7 +72,7 @@ public class ServerLogin implements MinecraftPacket {
     }
     if (version.compareTo(ProtocolVersion.MINECRAFT_1_19) >= 0) {
       if (buf.readBoolean()) { // Optional
-        publicKey = ProtocolUtils.readCompoundTag(buf, BinaryTagIO.reader());
+        publicKey = PublicKeyData.decode(buf);
       }
     }
   }
@@ -85,7 +87,7 @@ public class ServerLogin implements MinecraftPacket {
       boolean hasPublicKey = (publicKey != null);
       buf.writeBoolean(hasPublicKey);
       if (hasPublicKey) { // Optional
-        ProtocolUtils.writeCompoundTag(buf, publicKey);
+        PublicKeyData.encode(buf, publicKey);
       }
     }
   }
@@ -96,10 +98,7 @@ public class ServerLogin implements MinecraftPacket {
     // legal on the protocol level.
     final int origin = 1 + (16 * 4);
     if (version.compareTo(ProtocolVersion.MINECRAFT_1_19) >= 0) {
-      // https://api.minecraftservices.com/player/certificates
-      // Authorization: Bearer <ygg_token>
-      // expires_at(10 + 27 byte), [publicKey]signature(9 + 1024(max?) byte) , [public]key(3 + ???)
-      return origin + 2048; // i don't have a good idea
+      return origin + 8 + (512 + 2) + (4096 + 2);
     } else {
       return origin;
     }
@@ -108,5 +107,40 @@ public class ServerLogin implements MinecraftPacket {
   @Override
   public boolean handle(MinecraftSessionHandler handler) {
     return handler.handle(this);
+  }
+
+  public static class PublicKeyData {
+    public final Instant expiresAt;
+    public final PublicKey key;
+    public final byte[] keySig;
+
+    PublicKeyData(Instant expiresAt, PublicKey key, byte[] keySig) {
+      this.expiresAt = expiresAt;
+      this.key = key;
+      this.keySig = keySig;
+    }
+
+    public static void encode(ByteBuf buf, PublicKeyData data) {
+      buf.writeLong(data.expiresAt.toEpochMilli());
+      ProtocolUtils.writeByteArray(buf, data.key.getEncoded());
+      ProtocolUtils.writeByteArray(buf, data.keySig);
+    }
+
+    public static PublicKeyData decode(ByteBuf buf) {
+      Instant expiresAt = Instant.ofEpochMilli(buf.readLong());
+      byte[] encodedKey = ProtocolUtils.readByteArray(buf, 512);
+      PublicKey key = EncryptionUtils.generateRsaPublicKey(encodedKey);
+      byte[] keySig = ProtocolUtils.readByteArray(buf, 4096);
+      return new PublicKeyData(expiresAt, key, keySig);
+    }
+
+    @Override
+    public String toString() {
+      return "PublicKeyData{"
+          + "expiresAt=" + expiresAt
+          + ", key='" + key + '\''
+          + ", keySig=" + Arrays.toString(keySig)
+          + '}';
+    }
   }
 }

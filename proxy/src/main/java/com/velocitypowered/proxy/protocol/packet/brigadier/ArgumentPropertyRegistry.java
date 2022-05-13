@@ -181,8 +181,8 @@ public class ArgumentPropertyRegistry {
           }
         });
     register(4, "brigadier:long", LongArgumentType.class, LONG);
-    register(43, "minecraft:resource", RegistryKeyArgument.class, RegistryKeyArgumentSerializer.REGISTRY);
-    register(44, "minecraft:resource_or_tag", RegistryKeyArgument.class, RegistryKeyArgumentSerializer.REGISTRY);
+    register(44, "minecraft:resource", RegistryKeyArgument.class, RegistryKeyArgumentSerializer.REGISTRY);
+    register(43, "minecraft:resource_or_tag", RegistryKeyArgument.class, RegistryKeyArgumentSerializer.REGISTRY);
 
     // Crossstitch support
     register("crossstitch:mod_argument", ModArgumentProperty.class, MOD);
@@ -227,7 +227,9 @@ public class ArgumentPropertyRegistry {
     empty(37, "minecraft:int_range");
     empty(38, "minecraft:float_range");
     empty(42, "minecraft:time"); // added in 1.14
-    empty(45, "minecraft:uuid"); // added in 1.16
+    empty(47, "minecraft:uuid"); // added in 1.16
     empty(26, "minecraft:angle"); // added in 1.16.2
+    empty(45, "minecraft:template_mirror"); // added in 1.19
+    empty(46, "minecraft:template_rotation"); // added in 1.19
   }
 }

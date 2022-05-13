@@ -133,7 +133,8 @@ public class Respawn implements MinecraftPacket {
     String dimensionIdentifier = null;
     String levelName = null;
     if (version.compareTo(ProtocolVersion.MINECRAFT_1_16) >= 0) {
-      if (version.compareTo(ProtocolVersion.MINECRAFT_1_16_2) >= 0) {
+      if (version.compareTo(ProtocolVersion.MINECRAFT_1_16_2) >= 0 &&
+          version.compareTo(ProtocolVersion.MINECRAFT_1_19) < 0) {
         CompoundBinaryTag dimDataTag = ProtocolUtils.readCompoundTag(buf, BinaryTagIO.reader());
         dimensionIdentifier = ProtocolUtils.readString(buf);
         this.currentDimensionData = DimensionData.decodeBaseCompoundTag(dimDataTag, version)
@@ -166,7 +167,8 @@ public class Respawn implements MinecraftPacket {
   @Override
   public void encode(ByteBuf buf, ProtocolUtils.Direction direction, ProtocolVersion version) {
     if (version.compareTo(ProtocolVersion.MINECRAFT_1_16) >= 0) {
-      if (version.compareTo(ProtocolVersion.MINECRAFT_1_16_2) >= 0) {
+      if (version.compareTo(ProtocolVersion.MINECRAFT_1_16_2) >= 0 &&
+          version.compareTo(ProtocolVersion.MINECRAFT_1_19) < 0) {
         ProtocolUtils.writeCompoundTag(buf, currentDimensionData.serializeDimensionDetails());
         ProtocolUtils.writeString(buf, dimensionInfo.getRegistryIdentifier());
       } else {

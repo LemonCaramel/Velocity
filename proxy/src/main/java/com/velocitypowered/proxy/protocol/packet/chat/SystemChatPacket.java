@@ -39,7 +39,7 @@ public class SystemChatPacket extends GenericChatPacket {
   @Override
   public void decode(ByteBuf buf, ProtocolUtils.Direction direction, ProtocolVersion version) {
     super.decode(buf, direction, version);
-    type = ProtocolUtils.readVarInt(buf);
+    this.type = ProtocolUtils.readVarInt(buf);
   }
 
   @Override

@@ -184,7 +184,7 @@ public class ClientPlaySessionHandler implements MinecraftSessionHandler {
             if (chatResult.isAllowed()) {
               Optional<String> eventMsg = pme.getResult().getMessage();
               if (eventMsg.isPresent()) {
-                smc.write(GenericChatPacket.createServerbound(this.player.getProtocolVersion(), eventMsg.get()));
+                smc.write(GenericChatPacket.createServerbound(player.getProtocolVersion(), eventMsg.get()));
               } else {
                 smc.write(packet);
               }

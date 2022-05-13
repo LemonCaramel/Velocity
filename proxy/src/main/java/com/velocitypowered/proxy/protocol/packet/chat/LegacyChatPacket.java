@@ -56,9 +56,9 @@ public class LegacyChatPacket extends GenericChatPacket {
   public void decode(ByteBuf buf, ProtocolUtils.Direction direction, ProtocolVersion version) {
     super.decode(buf, direction, version);
     if (direction == ProtocolUtils.Direction.CLIENTBOUND && version.compareTo(ProtocolVersion.MINECRAFT_1_8) >= 0) {
-      type = buf.readByte();
+      this.type = buf.readByte();
       if (version.compareTo(ProtocolVersion.MINECRAFT_1_16) >= 0) {
-        sender = ProtocolUtils.readUuid(buf);
+        this.sender = ProtocolUtils.readUuid(buf);
       }
     }
   }
