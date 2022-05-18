@@ -29,6 +29,7 @@ public class ChatCommandPacket extends GenericChatPacket {
 
   private Instant timeStamp;
   private ArgumentSignatures argumentSignatures = ArgumentSignatures.EMPTY;
+  private boolean signedPreview;
 
   public ChatCommandPacket() {
     this.commandPacket = true;
@@ -38,16 +39,24 @@ public class ChatCommandPacket extends GenericChatPacket {
     return timeStamp;
   }
 
-  public void setArgumentSignatures(ArgumentSignatures argumentSignatures) {
-    this.argumentSignatures = argumentSignatures;
+  public void setTimeStamp(Instant timeStamp) {
+    this.timeStamp = timeStamp;
   }
 
   public ArgumentSignatures getArgumentSignatures() {
     return argumentSignatures;
   }
 
-  public void setTimeStamp(Instant timeStamp) {
-    this.timeStamp = timeStamp;
+  public void setArgumentSignatures(ArgumentSignatures argumentSignatures) {
+    this.argumentSignatures = argumentSignatures;
+  }
+
+  public boolean isSignedPreview() {
+    return signedPreview;
+  }
+
+  public void setSignedPreview(boolean signedPreview) {
+    this.signedPreview = signedPreview;
   }
 
   @Override
@@ -57,6 +66,7 @@ public class ChatCommandPacket extends GenericChatPacket {
         + ", commandPacket=" + commandPacket
         + ", timeStamp=" + timeStamp
         + ", argumentSignatures=" + argumentSignatures
+        + ", signedPreview=" + signedPreview
         + '}';
   }
 
@@ -65,6 +75,7 @@ public class ChatCommandPacket extends GenericChatPacket {
     this.message = ProtocolUtils.readString(buf, MAX_SERVERBOUND_MESSAGE_LENGTH); // Command
     this.timeStamp = Instant.ofEpochMilli(buf.readLong());
     this.argumentSignatures = ArgumentSignatures.decode(buf);
+    this.signedPreview = buf.readBoolean();
   }
 
   @Override
@@ -72,6 +83,7 @@ public class ChatCommandPacket extends GenericChatPacket {
     super.encode(buf, direction, version); // Command
     buf.writeLong(timeStamp.toEpochMilli());
     ArgumentSignatures.encode(buf, argumentSignatures);
+    buf.writeBoolean(signedPreview);
   }
 
   @Override

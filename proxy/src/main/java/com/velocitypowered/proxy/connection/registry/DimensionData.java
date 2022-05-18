@@ -19,6 +19,7 @@ package com.velocitypowered.proxy.connection.registry;
 
 import com.google.common.base.Preconditions;
 import com.velocitypowered.api.network.ProtocolVersion;
+import net.kyori.adventure.nbt.BinaryTag;
 import net.kyori.adventure.nbt.CompoundBinaryTag;
 import org.checkerframework.checker.nullness.qual.Nullable;
 
@@ -45,6 +46,8 @@ public final class DimensionData {
   private final @Nullable String effects;
   private final @Nullable Integer minY; // Required and added by 1.17
   private final @Nullable Integer height; // Required and added by 1.17
+  private final @Nullable BinaryTag monsterSpawnLightLevel; // Required and added by 1.19
+  private final @Nullable Integer monsterSpawnBlockLightLimit; // Required and added by 1.19
 
   /**
    * Initializes a new {@link DimensionData} instance.
@@ -68,6 +71,8 @@ public final class DimensionData {
    * @param effects optional, unknown purpose
    * @param minY the world effective lowest build-level
    * @param height the world height above zero
+   * @param monsterSpawnLightLevel the monster spawn light level, unknown purpose
+   * @param monsterSpawnBlockLightLimit the monster spawn block light limit, unknown purpose
    */
   public DimensionData(String registryIdentifier,
       @Nullable Integer dimensionId,
@@ -80,7 +85,9 @@ public final class DimensionData {
       @Nullable Long fixedTime, @Nullable Boolean createDragonFight,
       @Nullable Double coordinateScale,
       @Nullable String effects,
-      @Nullable Integer minY, @Nullable Integer height) {
+      @Nullable Integer minY, @Nullable Integer height,
+      @Nullable BinaryTag monsterSpawnLightLevel,
+      @Nullable Integer monsterSpawnBlockLightLimit) {
     Preconditions.checkNotNull(
         registryIdentifier, "registryIdentifier cannot be null");
     Preconditions.checkArgument(registryIdentifier.length() > 0,
@@ -110,6 +117,8 @@ public final class DimensionData {
     this.effects = effects;
     this.minY = minY;
     this.height = height;
+    this.monsterSpawnLightLevel = monsterSpawnLightLevel;
+    this.monsterSpawnBlockLightLimit = monsterSpawnBlockLightLimit;
   }
 
   public String getRegistryIdentifier() {
@@ -188,6 +197,14 @@ public final class DimensionData {
     return height;
   }
 
+  public @Nullable BinaryTag getMonsterSpawnLightLevel() {
+    return monsterSpawnLightLevel;
+  }
+
+  public @Nullable Integer getMonsterSpawnBlockLightLimit() {
+    return monsterSpawnBlockLightLimit;
+  }
+
   /**
    * Returns a fresh {@link DimensionData} with the specified {@code registryIdentifier}
    * and {@code dimensionId}.
@@ -201,7 +218,7 @@ public final class DimensionData {
     return new DimensionData(registryIdentifier, dimensionId, isNatural, ambientLight, isShrunk,
         isUltrawarm, hasCeiling, hasSkylight, isPiglinSafe, doBedsWork, doRespawnAnchorsWork,
         hasRaids, logicalHeight, burningBehaviourIdentifier, fixedTime, createDragonFight,
-        coordinateScale, effects, minY, height);
+        coordinateScale, effects, minY, height, monsterSpawnLightLevel, monsterSpawnBlockLightLimit);
   }
 
   public boolean isUnannotated() {
@@ -246,11 +263,21 @@ public final class DimensionData {
       Preconditions.checkNotNull(minY,
               "DimensionData requires 'minY' to be present for this version");
     }
+    BinaryTag monsterSpawnLightLevel = details.keySet().contains("monster_spawn_light_level")
+        ? details.get("monster_spawn_light_level") : null;
+    Integer monsterSpawnBlockLightLimit = details.keySet().contains("monster_spawn_block_light_limit")
+        ? details.getInt("monster_spawn_block_light_limit") : null;
+    if (version.compareTo(ProtocolVersion.MINECRAFT_1_19) >= 0) {
+      Preconditions.checkNotNull(monsterSpawnLightLevel,
+              "DimensionData requires 'monsterSpawnLightLevel' to be present for this version");
+      Preconditions.checkNotNull(monsterSpawnBlockLightLimit,
+              "DimensionData requires 'monsterSpawnBlockLightLimit' to be present for this version");
+    }
     return new DimensionData(
         UNKNOWN_DIMENSION_ID, null, isNatural, ambientLight, isShrunk,
         isUltrawarm, hasCeiling, hasSkylight, isPiglinSafe, doBedsWork, doRespawnAnchorsWork,
         hasRaids, logicalHeight, burningBehaviourIdentifier, fixedTime, hasEnderdragonFight,
-        coordinateScale, effects, minY, height);
+        coordinateScale, effects, minY, height, monsterSpawnLightLevel, monsterSpawnBlockLightLimit);
   }
 
   /**
@@ -282,7 +309,7 @@ public final class DimensionData {
    * @return compound containing the dimension data
    */
   public CompoundBinaryTag encodeAsCompoundTag(ProtocolVersion version) {
-    CompoundBinaryTag details = serializeDimensionDetails();
+    CompoundBinaryTag details = serializeDimensionDetails(version);
     if (version.compareTo(ProtocolVersion.MINECRAFT_1_16_2) >= 0) {
       if (dimensionId == null) {
         throw new IllegalStateException("Tried to serialize a 1.16.2+ dimension registry entry "
@@ -301,13 +328,16 @@ public final class DimensionData {
 
   /**
    * Serializes details of this dimension.
+   * @param version the version to serialize as
    * @return serialized details of this dimension
    */
-  public CompoundBinaryTag serializeDimensionDetails() {
+  public CompoundBinaryTag serializeDimensionDetails(ProtocolVersion version) {
     CompoundBinaryTag.Builder ret = CompoundBinaryTag.builder();
     ret.putBoolean("natural", isNatural);
     ret.putFloat("ambient_light", ambientLight);
-    ret.putBoolean("shrunk", isShrunk);
+    if (version.compareTo(ProtocolVersion.MINECRAFT_1_16_2) < 0) {
+      ret.putBoolean("shrunk", isShrunk); // removed form 1.16.2
+    }
     ret.putBoolean("ultrawarm", isUltrawarm);
     ret.putBoolean("has_ceiling", hasCeiling);
     ret.putBoolean("has_skylight", hasSkylight);
@@ -334,6 +364,14 @@ public final class DimensionData {
     }
     if (height != null) {
       ret.putInt("height", height);
+    }
+    if (version.compareTo(ProtocolVersion.MINECRAFT_1_19) >= 0) {
+      if (monsterSpawnLightLevel != null) {
+        ret.put("monster_spawn_light_level", monsterSpawnLightLevel);
+      }
+      if (monsterSpawnBlockLightLimit != null) {
+        ret.putInt("monster_spawn_block_light_limit", monsterSpawnBlockLightLimit);
+      }
     }
     return ret.build();
   }

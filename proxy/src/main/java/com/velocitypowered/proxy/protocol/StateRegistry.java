@@ -183,7 +183,7 @@ public enum StateRegistry {
       clientbound.register(PlayerChatPacket.class, PlayerChatPacket::new,
           map(0x30, MINECRAFT_1_19, false));
       clientbound.register(SystemChatPacket.class, SystemChatPacket::new,
-          map(0x5E, MINECRAFT_1_19, false));
+          map(0x5F, MINECRAFT_1_19, false));
       clientbound.register(TabCompleteResponse.class, TabCompleteResponse::new,
           map(0x3A, MINECRAFT_1_7_2, false),
           map(0x0E, MINECRAFT_1_9, false),
@@ -276,7 +276,7 @@ public enum StateRegistry {
           map(0x53, MINECRAFT_1_16, true),
           map(0x5E, MINECRAFT_1_17, true),
           map(0x5F, MINECRAFT_1_18, true),
-          map(0x5F, MINECRAFT_1_19, true));
+          map(0x60, MINECRAFT_1_19, true));
       clientbound.register(LegacyTitlePacket.class, LegacyTitlePacket::new,
           map(0x45, MINECRAFT_1_8, true),
           map(0x45, MINECRAFT_1_9, true),
@@ -288,19 +288,16 @@ public enum StateRegistry {
           map(0x4F, MINECRAFT_1_16, MINECRAFT_1_16_4, true));
       clientbound.register(TitleSubtitlePacket.class, TitleSubtitlePacket::new,
           map(0x57, MINECRAFT_1_17, true),
-          map(0x58, MINECRAFT_1_18, true),
-          map(0x57, MINECRAFT_1_19, true));
+          map(0x58, MINECRAFT_1_18, true));
       clientbound.register(TitleTextPacket.class, TitleTextPacket::new,
           map(0x59, MINECRAFT_1_17, true),
-          map(0x5A, MINECRAFT_1_18, true),
-          map(0x59, MINECRAFT_1_19, true));
+          map(0x5A, MINECRAFT_1_18, true));
       clientbound.register(TitleActionbarPacket.class, TitleActionbarPacket::new,
           map(0x41, MINECRAFT_1_17, true),
           map(0x40, MINECRAFT_1_19, true));
       clientbound.register(TitleTimesPacket.class, TitleTimesPacket::new,
           map(0x5A, MINECRAFT_1_17, true),
-          map(0x5B, MINECRAFT_1_18, true),
-          map(0x5A, MINECRAFT_1_19, true));
+          map(0x5B, MINECRAFT_1_18, true));
       clientbound.register(TitleClearPacket.class, TitleClearPacket::new,
           map(0x10, MINECRAFT_1_17, true),
           map(0x0D, MINECRAFT_1_19, true));
