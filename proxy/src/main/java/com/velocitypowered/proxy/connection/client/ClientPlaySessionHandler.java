@@ -452,7 +452,7 @@ public class ClientPlaySessionHandler implements MinecraftSessionHandler {
         new Respawn(sentOldDim, joinGame.getPartialHashedSeed(),
             joinGame.getDifficulty(), joinGame.getGamemode(), joinGame.getLevelType(),
             false, joinGame.getDimensionInfo(), joinGame.getPreviousGamemode(),
-            joinGame.getCurrentDimensionData()));
+            joinGame.getCurrentDimensionData(), joinGame.getLastDeathLocation()));
   }
 
   private void doSafeClientServerSwitch(JoinGame joinGame) {
@@ -469,14 +469,14 @@ public class ClientPlaySessionHandler implements MinecraftSessionHandler {
         new Respawn(tempDim, joinGame.getPartialHashedSeed(), joinGame.getDifficulty(),
             joinGame.getGamemode(), joinGame.getLevelType(),
             false, joinGame.getDimensionInfo(), joinGame.getPreviousGamemode(),
-            joinGame.getCurrentDimensionData()));
+            joinGame.getCurrentDimensionData(), joinGame.getLastDeathLocation()));
 
     // Now send a respawn packet in the correct dimension.
     player.getConnection().delayedWrite(
         new Respawn(joinGame.getDimension(), joinGame.getPartialHashedSeed(),
             joinGame.getDifficulty(), joinGame.getGamemode(), joinGame.getLevelType(),
             false, joinGame.getDimensionInfo(), joinGame.getPreviousGamemode(),
-            joinGame.getCurrentDimensionData()));
+            joinGame.getCurrentDimensionData(), joinGame.getLastDeathLocation()));
   }
 
   public List<UUID> getServerBossBars() {

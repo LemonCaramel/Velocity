@@ -24,6 +24,7 @@ import com.velocitypowered.proxy.connection.registry.DimensionInfo;
 import com.velocitypowered.proxy.protocol.MinecraftPacket;
 import com.velocitypowered.proxy.protocol.ProtocolUtils;
 import io.netty.buffer.ByteBuf;
+import it.unimi.dsi.fastutil.Pair;
 import net.kyori.adventure.nbt.BinaryTagIO;
 import net.kyori.adventure.nbt.CompoundBinaryTag;
 
@@ -38,13 +39,14 @@ public class Respawn implements MinecraftPacket {
   private DimensionInfo dimensionInfo; // 1.16-1.16.1
   private short previousGamemode; // 1.16+
   private DimensionData currentDimensionData; // 1.16.2+
+  private Pair<String, Long> lastDeathLocation; // 1.19+
 
   public Respawn() {
   }
 
   public Respawn(int dimension, long partialHashedSeed, short difficulty, short gamemode,
       String levelType, boolean shouldKeepPlayerData, DimensionInfo dimensionInfo,
-      short previousGamemode, DimensionData currentDimensionData) {
+      short previousGamemode, DimensionData currentDimensionData, Pair<String, Long> lastDeathLocation) {
     this.dimension = dimension;
     this.partialHashedSeed = partialHashedSeed;
     this.difficulty = difficulty;
@@ -54,6 +56,7 @@ public class Respawn implements MinecraftPacket {
     this.dimensionInfo = dimensionInfo;
     this.previousGamemode = previousGamemode;
     this.currentDimensionData = currentDimensionData;
+    this.lastDeathLocation = lastDeathLocation;
   }
 
   public int getDimension() {
@@ -112,6 +115,14 @@ public class Respawn implements MinecraftPacket {
     this.previousGamemode = previousGamemode;
   }
 
+  public Pair<String, Long> getLastDeathLocation() {
+    return lastDeathLocation;
+  }
+
+  public void setLastDeathLocation(Pair<String, Long> lastDeathLocation) {
+    this.lastDeathLocation = lastDeathLocation;
+  }
+
   @Override
   public String toString() {
     return "Respawn{"
@@ -125,6 +136,7 @@ public class Respawn implements MinecraftPacket {
         + ", dimensionInfo=" + dimensionInfo
         + ", previousGamemode=" + previousGamemode
         + ", dimensionData=" + currentDimensionData
+        + ", lastDeathLocation=" + lastDeathLocation
         + '}';
   }
 
@@ -162,6 +174,11 @@ public class Respawn implements MinecraftPacket {
     } else {
       this.levelType = ProtocolUtils.readString(buf, 16);
     }
+    if (version.compareTo(ProtocolVersion.MINECRAFT_1_19) >= 0) {
+      if (buf.readBoolean()) {
+        this.lastDeathLocation = Pair.of(ProtocolUtils.readString(buf), buf.readLong());
+      }
+    }
   }
 
   @Override
@@ -192,6 +209,15 @@ public class Respawn implements MinecraftPacket {
       buf.writeBoolean(shouldKeepPlayerData);
     } else {
       ProtocolUtils.writeString(buf, levelType);
+    }
+    if (version.compareTo(ProtocolVersion.MINECRAFT_1_19) >= 0) {
+      if (lastDeathLocation == null) {
+        buf.writeBoolean(false);
+      } else {
+        buf.writeBoolean(true);
+        ProtocolUtils.writeString(buf, lastDeathLocation.first());
+        buf.writeLong(lastDeathLocation.second());
+      }
     }
   }
 
